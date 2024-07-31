@@ -37,7 +37,7 @@ num_epochs = 20
 
 # Training
 for epoch in range(num_epochs):
-    learning_rate = 0.0001
+    learning_rate = 0.001
     LOSS = []
     for i in range(0, X_train.shape[0], batch_size):
         end = i + batch_size
