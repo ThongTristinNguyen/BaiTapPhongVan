@@ -1,76 +1,75 @@
+import numpy as np
+import time
 import os
-from model import SimpleNN
-from utils import load_data, triplet_loss
+from utils import read_mnist_images, read_mnist_labels, preprocess_data
+from models import CustomNN, compute_accuracy
 
-def evaluate_accuracy(model, X, y):
-    correct = 0
-    total = 0
-    for i in range(0, X.shape[0], batch_size):
+start_time = time.time()
+
+# Load data
+train_images_path = r'/content/drive/MyDrive/BaiTapPhongVan/MNIST/train-images.idx3-ubyte'
+train_labels_path = r'/content/drive/MyDrive/BaiTapPhongVan/MNIST/train-labels.idx1-ubyte'
+test_images_path = r'/content/drive/MyDrive/BaiTapPhongVan/MNIST/t10k-images.idx3-ubyte'
+test_labels_path = r'/content/drive/MyDrive/BaiTapPhongVan/MNIST/t10k-labels.idx1-ubyte'
+
+train_images = read_mnist_images(train_images_path)
+train_labels = read_mnist_labels(train_labels_path)
+test_images = read_mnist_images(test_images_path)
+test_labels = read_mnist_labels(test_labels_path)
+
+# Preprocess data
+X_train = preprocess_data(train_images)
+X_test = preprocess_data(test_images)
+
+# Initialize model
+input_size = 784
+hidden_size = 128
+output_size = 64
+model = CustomNN(input_size, hidden_size, output_size)
+
+# Shuffle training data
+permutation = np.random.permutation(X_train.shape[0])
+X_train = X_train[permutation]
+train_labels = train_labels[permutation]
+
+batch_size = 64
+num_epochs = 20
+
+# Training
+for epoch in range(num_epochs):
+    learning_rate = 0.0001
+    LOSS = []
+    for i in range(0, X_train.shape[0], batch_size):
         end = i + batch_size
-        if end > X.shape[0]:
+        if end > X_train.shape[0]:
             break
-
-        anchor_batch = X[i:end]
-        positive_batch = X[i:end]
-        negative_batch = X[(i + batch_size) % X.shape[0]: (i + 2 * batch_size) % X.shape[0]]
-
-        # Get predictions for the test batch
-        anchor_output = model.forward(anchor_batch)
-        positive_output = model.forward(positive_batch)
-        negative_output = model.forward(negative_batch)
         
-        # Implement a dummy accuracy calculation or use a more suitable metric for your task
-        correct += np.sum(np.argmax(anchor_output, axis=1) == np.argmax(positive_output, axis=1))
-        total += len(anchor_batch)
-
-    accuracy = correct / total
-    return accuracy
-
-def train(model, X_train, y_train, X_test, y_test, num_epochs, batch_size, learning_rate):
-    for epoch in range(num_epochs):
-        LOSS = []
-        for i in range(0, X_train.shape[0], batch_size):
-            end = i + batch_size
-            if end > X_train.shape[0]:
-                break
-            
-            anchor_batch = X_train[i:end]
-            positive_batch = X_train[i:end]
-            negative_batch = X_train[(i + batch_size) % X_train.shape[0]: (i + 2 * batch_size) % X_train.shape[0]]
-            
-            if len(negative_batch) < len(anchor_batch):
-                continue
-            
-            loss, _ = model.compute_loss(anchor_batch, positive_batch, negative_batch)
-            LOSS.append(loss)
-            model.backward(anchor_batch, positive_batch, negative_batch, learning_rate=learning_rate)
+        anchor_batch = X_train[i:end]
+        positive_batch = X_train[i:end]
+        negative_batch = X_train[(i + batch_size) % X_train.shape[0]: (i + 2 * batch_size) % X_train.shape[0]]
         
-        train_accuracy = evaluate_accuracy(model, X_train, y_train)
-        test_accuracy = evaluate_accuracy(model, X_test, y_test)
+        if len(negative_batch) < len(anchor_batch):
+            continue
         
-        print(f'Epoch {epoch + 1}/{num_epochs}, Loss: {np.mean(LOSS)}, Train Accuracy: {train_accuracy}, Test Accuracy: {test_accuracy}')
-    
-    # Save the model weights after training
-    model.save_weights('weights/nn_model.h5')
+        loss = model.compute_loss(anchor_batch, positive_batch, negative_batch)
+        LOSS.append(loss)
+        model.backward(anchor_batch, positive_batch, negative_batch, learning_rate=learning_rate)
+        
+    print(f'Epoch {epoch + 1}:')
+    print(f'Loss: {np.mean(LOSS):.4f}')
 
-def main():
-    # Load MNIST data
-    X_train, y_train, X_test, y_test = load_data()
-    
-    input_size = 28 * 28
-    hidden_size = 128
-    output_size = 64
-    learning_rate = 0.01
-    num_epochs = 10
-    batch_size = 32
-    
-    model = SimpleNN(input_size, hidden_size, output_size)
-    
-    # Create directory for saving weights if it doesn't exist
-    os.makedirs('weights', exist_ok=True)
-    
-    # Train the model
-    train(model, X_train, y_train, X_test, y_test, num_epochs, batch_size, learning_rate)
+# Save model weights
+save_path = r'/content/drive/MyDrive/BaiTapPhongVan/Weight/weight.h5'
+os.makedirs(os.path.dirname(save_path), exist_ok=True)
+model.save_weights(save_path)
+print('Model weights saved.')
 
-if __name__ == "__main__":
-    main()
+# Evaluate on test data
+anchor_test = X_test[:batch_size]
+positive_test = X_test[:batch_size]
+negative_test = X_test[batch_size:2 * batch_size]
+
+test_loss = model.compute_loss(anchor_test, positive_test, negative_test)
+test_accuracy = compute_accuracy(anchor_test, positive_test, negative_test, model)
+
+print(f'Accuracy: {test_accuracy * 100:.2f}%')
