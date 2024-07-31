@@ -1,17 +1,18 @@
-# Use an official Python runtime as a parent image
+# Sử dụng hình ảnh Python chính thức
 FROM python:3.9-slim
 
-# Set the working directory in the container
+# Đặt thư mục làm việc trong container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Sao chép các file cần thiết vào container
+COPY app.py classifier.py data_loader.py /app/
+COPY svm_model.pkl /app/
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Cài đặt các gói cần thiết
+RUN pip install flask Pillow numpy scikit-learn joblib opencv-python
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
+# Expose port 8000
+EXPOSE 8000
 
-# Run app.py when the container launches
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+# Command to run the application
+CMD ["python", "app.py"]
